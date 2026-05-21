@@ -75,11 +75,21 @@ snd_alarm = load_sound("assets/sfx/Larm.mp3")
 
 path_music_menu = "assets/sfx/Meny.mp3"
 path_music_game = "assets/sfx/Lägenheten.mp3"
+path_music_berlinda = "assets/sfx/Berlinda.mp3"
 current_playing_track = None
+
+berlinda_code = [pygame.K_b, pygame.K_e, pygame.K_r, pygame.K_l, pygame.K_i, pygame.K_n, pygame.K_d, pygame.K_a]
+berlinda_index = 0
+berlinda_mode = False
 
 def update_music(current_scene):
     global current_playing_track
-    target_track = path_music_menu if current_scene in ["menu", "achievements", "settings"] else path_music_game
+    
+    if berlinda_mode:
+        target_track = path_music_berlinda
+    else:
+        target_track = path_music_menu if current_scene in ["menu", "achievements", "settings"] else path_music_game
+        
     if target_track and target_track != current_playing_track:
         if os.path.exists(target_track):
             pygame.mixer.music.load(target_track)
@@ -389,8 +399,23 @@ def draw_screen(mouse_pos, current_time, mouse_pressed):
         draw_settings(mouse_pos, mouse_pressed)
     elif state.scene == "win":
         screen.fill(BLACK)
-        t = font_menu.render("MIDNIGHT - YOU SURVIVED", True, GREEN)
-        screen.blit(t, (WIDTH//2 - t.get_width()//2, HEIGHT//2))
+        
+        win_lines = [
+            "As the clock strikes midnight,",
+            "your computer turns off, the creaking",
+            "and screaming stops,",
+            "and you are at peace.",
+            "Who they are remains unknown,",
+            "but you sleep all the while,",
+            "feeling that it isn't over yet..."
+        ]
+        
+        start_y = HEIGHT // 2 - 120
+        
+        for i, line in enumerate(win_lines):
+            t = font_menu.render(line, True, RED)
+            screen.blit(t, (WIDTH // 2 - t.get_width() // 2, start_y + (i * 35)))
+            
         btn_continue.draw(screen, mouse_pos)
     elif state.game_state == "playing":
         if state.scene == "room": draw_room(mouse_pos)
@@ -474,6 +499,14 @@ while True:
                     state.scene = "menu"
                     
         if event.type == pygame.KEYDOWN:
+            if event.key == berlinda_code[berlinda_index]:
+                berlinda_index += 1
+                if berlinda_index == len(berlinda_code):
+                    berlinda_mode = not berlinda_mode
+                    berlinda_index = 0
+                    current_playing_track = None
+            else:
+                berlinda_index = 1 if event.key == pygame.K_b else 0
             if event.key == pygame.K_ESCAPE:
                 if state.scene == "peephole": state.scene = "room"
                 elif state.scene in ["achievements", "win", "settings"]: state.scene = "menu"
