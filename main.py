@@ -7,9 +7,6 @@ import os
 pygame.init()
 pygame.mixer.init()
 
-# ==========================================
-# --- INSTÄLLNINGAR & KONSTANTER ---
-# ==========================================
 WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("The Peephole - Entity Edition")
@@ -27,14 +24,10 @@ font_menu = pygame.font.SysFont("courier new", 30, bold=True)
 font_small = pygame.font.SysFont("courier new", 16, bold=True)
 font_clock = pygame.font.SysFont("courier new", 40, bold=True)
 
-# Fasta positioner
 comp_x, comp_y = 115, 260
 door_rect = pygame.Rect(600, 180, 110, 280)
 MINUTE_DURATION = 1000
 
-# ==========================================
-# --- FILHANTERING ---
-# ==========================================
 def load_data():
     if os.path.exists("data.txt"):
         with open("data.txt", "r") as f:
@@ -50,9 +43,6 @@ def save_data(data):
 
 game_data = load_data()
 
-# ==========================================
-# --- RESURSHANTERING ---
-# ==========================================
 def load_image(path, size=None):
     if os.path.exists(path):
         try:
@@ -70,6 +60,9 @@ img_p1_raw = load_image("assets/Neighbours/Person1.png")
 img_p2_raw = load_image("assets/Neighbours/Person2.png")
 img_p1_peephole = load_image("assets/Neighbours/Person1.png", (150, 250))
 img_p2_peephole = load_image("assets/Neighbours/Person2.png", (180, 280))
+img_granne = load_image("assets/Neighbours/granne.png")
+img_p3_raw = load_image("assets/Neighbours/Person3.png")
+img_p3_window = load_image("assets/Neighbours/Person3.png", (120, 160))
 img_computer = load_image("assets/computer.png", (220, 160))
 img_corridor = load_image("assets/corridor.png", (110, 280)) 
 
@@ -77,6 +70,7 @@ snd_knock_calm = load_sound("assets/sfx/Calm knock.mp3")
 snd_knock_loud = load_sound("assets/sfx/Banging.mp3")
 snd_jumpscare1 = load_sound("assets/sfx/Jumpscare1.mp3")
 snd_jumpscare2 = load_sound("assets/sfx/Jumpscare2.mp3")
+snd_jumpscare3 = load_sound("assets/sfx/Jumpscare3.mp3")
 snd_alarm = load_sound("assets/sfx/Larm.mp3")
 
 path_music_menu = "assets/sfx/Meny.mp3"
@@ -92,9 +86,6 @@ def update_music(current_scene):
             pygame.mixer.music.play(-1)
             current_playing_track = target_track
 
-# ==========================================
-# --- SPELTILLSTÅND (STATE) ---
-# ==========================================
 class GameState:
     def __init__(self):
         self.reset()
@@ -113,17 +104,21 @@ class GameState:
         self.visitor_type = 1
         self.visitor_timer = 0
         self.stare_timer = 0
+
+        self.window_visitor_active = False
+        self.window_visitor_timer = 0
+        self.window_flash_duration = 0
         
         self.jumpscare_played = False
         self.death_time_start = 0
         self.death_reason = ""
         self.charge_flash = 0
         
-        # Alarm Minigame Variabler
         self.alarm_active = False
         self.alarm_timer_start = 0
         self.alarm_circles = []
         self.alarm_clicks_needed = 0
+        self.alarm_failures = 0
         
         self.game_hour = 9
         self.game_minute = 0
@@ -132,7 +127,6 @@ class GameState:
 
     def spawn_alarm_circle(self):
         radius = 35
-        # Begränsa var cirklarna kan hamna så de inte hamnar utanför skärmen
         x = random.randint(radius, WIDTH - radius)
         y = random.randint(radius, HEIGHT - radius)
         self.alarm_circles.append(pygame.Rect(x - radius, y - radius, radius * 2, radius * 2))
@@ -159,9 +153,6 @@ class GameState:
 
 state = GameState()
 
-# ==========================================
-# --- UI-KOMPONENTER ---
-# ==========================================
 class Button:
     def __init__(self, x, y, width, height, text, font, base_color, hover_color, text_color=WHITE):
         self.rect = pygame.Rect(x, y, width, height)
@@ -216,9 +207,6 @@ btn_charge = Button(comp_x + 75, comp_y + 45, 70, 25, "CHARGE", font_small, DARK
 btn_continue = Button(WIDTH - 180, HEIGHT - 70, 160, 50, "CONTINUE", font_small, GREY, (100, 0, 0))
 volume_slider = Slider(WIDTH//2 - 100, 250, 200, 20, start_val=0.5)
 
-# ==========================================
-# --- RITNING OCH GRAFIK ---
-# ==========================================
 def draw_clock():
     time_str = f"{state.game_hour:02}:{state.game_minute:02} {state.game_period}"
     screen.blit(font_clock.render(time_str, True, WHITE), (WIDTH - 220, 30))
@@ -245,6 +233,10 @@ def draw_room(mouse_pos):
     pygame.draw.circle(sky_surface, sky_color, (mx + 8, my), 12)
 
     screen.blit(sky_surface, (win_x, win_y))
+
+    if state.window_visitor_active and img_p3_window:
+        screen.blit(img_p3_window, (win_x, win_y))
+
     pygame.draw.rect(screen, (40, 40, 45), (win_x, win_y, win_w, win_h), 5)
     
     pygame.draw.line(screen, (40, 40, 45), (win_x + 60, win_y), (win_x + 60, win_y + win_h), 4)
@@ -297,17 +289,15 @@ def draw_room(mouse_pos):
             pygame.draw.circle(surf, (255, 255, 220, ga), (gr, gr), gr)
             screen.blit(surf, (mouse_x - gr, mouse_y - gr))
 
-    # Rita upp larm-minigamet
     if state.alarm_active:
-        # Blinkande röd skärm
         if (pygame.time.get_ticks() // 250) % 2 == 0:
             overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             overlay.fill((200, 0, 0, 50))
             screen.blit(overlay, (0, 0))
             
         time_left = max(0, 5000 - (pygame.time.get_ticks() - state.alarm_timer_start)) / 1000
-        alarm_text = font_menu.render(f"LARM! KLICKA CIRKLARNA! {time_left:.1f}s", True, RED)
-        screen.blit(alarm_text, (WIDTH//2 - alarm_text.get_width()//2, 50))
+        alarm_text = font_menu.render(f"LARM WENT OFF! CLICK THE CIRCLES! {time_left:.1f}s", True, RED)
+        screen.blit(alarm_text, (WIDTH//2 - alarm_text.get_width()//2 - 10, 50))
         
         for circle in state.alarm_circles:
             pygame.draw.circle(screen, RED, circle.center, circle.width // 2)
@@ -359,14 +349,31 @@ def draw_lost(current_time):
     elapsed = current_time - state.death_time_start
     if elapsed < 2500:
         if not state.jumpscare_played:
-            s = snd_jumpscare1 if ("1" in state.death_reason or "power" in state.death_reason) else snd_jumpscare2
+            if "3" in state.death_reason:
+                s = snd_jumpscare3
+            else:
+                s = snd_jumpscare1 if ("1" in state.death_reason or "power" in state.death_reason) else snd_jumpscare2
+                
             if s: s.play()
             state.jumpscare_played = True
             
         shake_x, shake_y = random.randint(-15, 15), random.randint(-15, 15)
         screen.fill((random.randint(0,20), 0, 0)) 
-        img = img_p1_raw if ("1" in state.death_reason or "power" in state.death_reason) else img_p2_raw
-        if img: screen.blit(pygame.transform.smoothscale(img, (WIDTH + 40, HEIGHT + 40)), (-20 + shake_x, -20 + shake_y))
+        
+        if state.death_reason == "granne":
+            img = img_granne
+        elif "3" in state.death_reason:
+            img = img_p3_raw
+        else:
+            img = img_p1_raw if ("1" in state.death_reason or "power" in state.death_reason) else img_p2_raw
+            
+        if img: 
+            screen.blit(pygame.transform.smoothscale(img, (WIDTH + 40, HEIGHT + 40)), (-20 + shake_x, -20 + shake_y))
+            
+        if state.death_reason == "granne":
+            granne_text = font_menu.render("Neighbour threw you out", True, RED)
+            screen.blit(granne_text, (WIDTH//2 - granne_text.get_width()//2, HEIGHT - 80))
+            
     elif elapsed < 5500:
         screen.fill(BLACK)
     else: 
@@ -391,9 +398,6 @@ def draw_screen(mouse_pos, current_time, mouse_pressed):
     elif state.game_state == "lost":
         draw_lost(current_time)
 
-# ==========================================
-# --- HUVUDLOOP ---
-# ==========================================
 while True:
     current_time = pygame.time.get_ticks()
     mouse_pos = pygame.mouse.get_pos()
@@ -401,7 +405,6 @@ while True:
     
     update_music(state.scene)
 
-    # --- 1. EVENTHANTERING (Klick & Knappar) ---
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit(); sys.exit()
@@ -419,8 +422,6 @@ while True:
                     pygame.quit(); sys.exit()
                     
             elif state.scene == "room" and state.game_state == "playing":
-                
-                # Om larmet är igång, blockera vanliga handlingar och hantera bara minigamet
                 if state.alarm_active:
                     for circle in state.alarm_circles[:]:
                         if circle.collidepoint(mouse_x, mouse_y):
@@ -429,18 +430,15 @@ while True:
                             if state.alarm_clicks_needed > 0:
                                 state.spawn_alarm_circle()
                             else:
-                                state.alarm_active = False # Minigamet vunnet
+                                state.alarm_active = False
                                 if snd_alarm: snd_alarm.stop()
                             break
                             
-                # Annars spela som vanligt
                 else:
-                    # Klicka på batteriknappen
                     if btn_charge.is_clicked(mouse_pos):
                         state.power_level = min(100, state.power_level + 10)
                         state.charge_flash = 5
                         
-                        # 1/100 chans att larmet utlöses
                         if random.randint(1, 100) == 1:
                             state.alarm_active = True
                             if snd_alarm: snd_alarm.play(-1)
@@ -449,7 +447,6 @@ while True:
                             state.alarm_circles = []
                             state.spawn_alarm_circle()
                             
-                        # Vanlig monsterchans om inget larm startar
                         elif not state.visitor_outside and random.random() < 0.05:
                             state.visitor_outside = True
                             state.visitor_type = random.choice([1, 2])
@@ -458,7 +455,6 @@ while True:
                             s = snd_knock_calm if state.visitor_type == 1 else snd_knock_loud
                             if s: s.play()
                     
-                    # Dörrhandtaget
                     current_knob_rect = pygame.Rect(695, 295, 50, 50) if state.door_open else pygame.Rect(595, 295, 50, 50)
                     if current_knob_rect.collidepoint(mouse_x, mouse_y) and not state.walking_in:
                         state.door_open = not state.door_open
@@ -470,7 +466,6 @@ while True:
                                 state.walking_in = True
                                 state.walker_x = door_rect.x - 20 
 
-                    # Kikhålet
                     elif door_rect.collidepoint(mouse_x, mouse_y) and not state.door_open and not state.walking_in:
                         state.scene = "peephole"
                     
@@ -486,22 +481,40 @@ while True:
             if event.key == pygame.K_f and state.scene == "room" and state.game_state == "playing":
                 state.flashlight_on = not state.flashlight_on
 
-    # --- 2. SPELLOGIK (Uppdateringar) ---
     if state.scene not in ["menu", "achievements", "win"] and state.game_state == "playing":
-        
-        # Kolla om larm-minigamet pågår
         if state.alarm_active:
             if current_time - state.alarm_timer_start > 5000:
                 state.alarm_active = False
                 if snd_alarm: snd_alarm.stop()
-                state.visitor_outside
+        
+                state.alarm_failures += 1
+                if state.alarm_failures >= 2:
+                    state.trigger_loss("granne", current_time)
 
-        # Batteri
+        if not state.window_visitor_active and random.random() < 0.001:
+            state.window_visitor_active = True
+            state.window_visitor_timer = current_time
+            state.window_flash_duration = 0
+
+        if state.window_visitor_active:
+            window_rect = pygame.Rect(50, 100, 120, 160)
+            
+            if state.scene == "room" and state.flashlight_on and window_rect.collidepoint(mouse_x, mouse_y):
+                state.window_flash_duration += clock.get_time()
+                
+                if state.window_flash_duration >= 3000:
+                    state.window_visitor_active = False
+            else:
+                state.window_flash_duration = 0
+
+            if current_time - state.window_visitor_timer > 7000:
+                state.window_visitor_active = False
+                state.trigger_loss("monster3", current_time)
+
         state.power_level -= 0.20 if (state.scene == "room" and state.flashlight_on) else 0.05
         if state.power_level <= 0: 
             state.trigger_loss("power", current_time)
 
-        # Tid
         if current_time - state.last_minute_tick >= MINUTE_DURATION:
             state.game_minute += 1
             state.last_minute_tick = current_time
@@ -512,14 +525,12 @@ while True:
                 else:
                     state.game_hour = 1 if state.game_hour == 12 else state.game_hour + 1
 
-        # Animation för monster som går in
         if state.walking_in:
             state.walker_x -= 3 
             if state.walker_x < -150: 
                 state.walking_in = False
                 state.door_open = False 
 
-        # Monster logik
         if state.visitor_outside:
             if state.scene == "peephole":
                 if state.visitor_type == 1:
@@ -533,7 +544,6 @@ while True:
             if state.visitor_timer > 550: 
                 state.trigger_loss(f"monster{state.visitor_type}", current_time)
 
-    # --- 3. RITNING PÅ SKÄRMEN ---
     mouse_pressed = pygame.mouse.get_pressed()
     draw_screen(mouse_pos, current_time, mouse_pressed)
 
