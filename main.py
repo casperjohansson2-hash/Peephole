@@ -8,9 +8,13 @@ pygame.init()
 pygame.mixer.init()
 
 WIDTH, HEIGHT = 800, 600
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("The Peephole - Entity Edition")
+virtual_screen = pygame.Surface((WIDTH, HEIGHT))
+
+screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
+pygame.display.set_caption("The Peephole - (B E R L I N D A)")
 clock = pygame.time.Clock()
+
+is_fullscreen = False
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -215,15 +219,16 @@ btn_settings = Button(WIDTH//2 - 125, 340, 250, 50, "SETTINGS", font_menu, GREY,
 btn_close = Button(WIDTH//2 - 125, 410, 250, 50, "CLOSE", font_menu, GREY, (100, 0, 0))
 btn_charge = Button(comp_x + 75, comp_y + 45, 70, 25, "CHARGE", font_small, DARK_GREY, GREEN)
 btn_continue = Button(WIDTH - 180, HEIGHT - 70, 160, 50, "CONTINUE", font_small, GREY, (100, 0, 0))
-volume_slider = Slider(WIDTH//2 - 100, 250, 200, 20, start_val=0.5)
+btn_wakeup = Button(WIDTH - 180, HEIGHT - 70, 160, 50, "WAKE UP", font_small, GREY, (100, 0, 0))
+volume_slider = Slider(WIDTH//2 - 100, 170, 200, 20, start_val=0.5)
 
 def draw_clock():
     time_str = f"{state.game_hour:02}:{state.game_minute:02} {state.game_period}"
-    screen.blit(font_clock.render(time_str, True, WHITE), (WIDTH - 220, 30))
+    virtual_screen.blit(font_clock.render(time_str, True, WHITE), (WIDTH - 220, 30))
 
 def draw_room(mouse_pos):
     bg_brightness = max(5, int(state.power_level / 5))
-    screen.fill((bg_brightness, bg_brightness, bg_brightness + 10))
+    virtual_screen.fill((bg_brightness, bg_brightness, bg_brightness + 10))
 
     win_x, win_y, win_w, win_h = 50, 100, 120, 160
     total_mins = state.get_total_minutes()
@@ -242,53 +247,53 @@ def draw_room(mouse_pos):
     pygame.draw.circle(sky_surface, (220, 220, 255), (mx, my), 12)
     pygame.draw.circle(sky_surface, sky_color, (mx + 8, my), 12)
 
-    screen.blit(sky_surface, (win_x, win_y))
+    virtual_screen.blit(sky_surface, (win_x, win_y))
 
     if state.window_visitor_active and img_p3_window:
-        screen.blit(img_p3_window, (win_x, win_y))
+        virtual_screen.blit(img_p3_window, (win_x, win_y))
 
-    pygame.draw.rect(screen, (40, 40, 45), (win_x, win_y, win_w, win_h), 5)
+    pygame.draw.rect(virtual_screen, (40, 40, 45), (win_x, win_y, win_w, win_h), 5)
     
-    pygame.draw.line(screen, (40, 40, 45), (win_x + 60, win_y), (win_x + 60, win_y + win_h), 4)
-    pygame.draw.line(screen, (40, 40, 45), (win_x, win_y + 80), (win_x + win_w, win_y + 80), 4)
+    pygame.draw.line(virtual_screen, (40, 40, 45), (win_x + 60, win_y), (win_x + 60, win_y + win_h), 4)
+    pygame.draw.line(virtual_screen, (40, 40, 45), (win_x, win_y + 80), (win_x + win_w, win_y + 80), 4)
     
-    pygame.draw.rect(screen, (15, 15, 15), (0, 450, WIDTH, 150)) 
+    pygame.draw.rect(virtual_screen, (15, 15, 15), (0, 450, WIDTH, 150)) 
     
     if state.door_open:
-        if img_corridor: screen.blit(img_corridor, (door_rect.x, door_rect.y))
-        else: pygame.draw.rect(screen, (10, 10, 10), door_rect)
+        if img_corridor: virtual_screen.blit(img_corridor, (door_rect.x, door_rect.y))
+        else: pygame.draw.rect(virtual_screen, (10, 10, 10), door_rect)
             
         if state.visitor_outside:
             v_img = img_p1_raw if state.visitor_type == 1 else img_p2_raw
             if v_img:
-                screen.blit(pygame.transform.smoothscale(v_img, (90, 250)), (door_rect.x + 10, door_rect.y + 30))
+                virtual_screen.blit(pygame.transform.smoothscale(v_img, (90, 250)), (door_rect.x + 10, door_rect.y + 30))
                 
         open_door_rect = pygame.Rect(710, 180, 50, 280)
-        pygame.draw.rect(screen, (20, 10, 5), open_door_rect) 
-        pygame.draw.circle(screen, (120, 110, 0), (720, 320), 12) 
+        pygame.draw.rect(virtual_screen, (20, 10, 5), open_door_rect) 
+        pygame.draw.circle(virtual_screen, (120, 110, 0), (720, 320), 12) 
         
         close_txt = font_small.render("CLOSE", True, WHITE)
-        screen.blit(close_txt, (720 - close_txt.get_width()//2, 340))
+        virtual_screen.blit(close_txt, (720 - close_txt.get_width()//2, 340))
         
     else:
-        pygame.draw.rect(screen, (30, 15, 5), door_rect)
-        pygame.draw.circle(screen, (120, 110, 0), (620, 320), 12) 
+        pygame.draw.rect(virtual_screen, (30, 15, 5), door_rect)
+        pygame.draw.circle(virtual_screen, (120, 110, 0), (620, 320), 12) 
 
-    pygame.draw.rect(screen, (35, 25, 20), (100, 420, 250, 30)) 
-    pygame.draw.rect(screen, (25, 15, 10), (120, 450, 15, 50))  
-    pygame.draw.rect(screen, (25, 15, 10), (315, 450, 15, 50))  
-    if img_computer: screen.blit(img_computer, (comp_x, comp_y))
+    pygame.draw.rect(virtual_screen, (35, 25, 20), (100, 420, 250, 30)) 
+    pygame.draw.rect(virtual_screen, (25, 15, 10), (120, 450, 15, 50))  
+    pygame.draw.rect(virtual_screen, (25, 15, 10), (315, 450, 15, 50))  
+    if img_computer: virtual_screen.blit(img_computer, (comp_x, comp_y))
     
     btn_charge.base_color = GREEN if state.charge_flash > 0 else DARK_GREY
     if state.charge_flash > 0: state.charge_flash -= 1
-    btn_charge.draw(screen, mouse_pos)
+    btn_charge.draw(virtual_screen, mouse_pos)
     
-    pygame.draw.rect(screen, BLACK, (btn_charge.rect.x, btn_charge.rect.bottom + 5, 70, 10))
-    pygame.draw.rect(screen, GREEN if state.power_level > 30 else RED, (btn_charge.rect.x, btn_charge.rect.bottom + 5, int(70 * (state.power_level/100)), 10))
+    pygame.draw.rect(virtual_screen, BLACK, (btn_charge.rect.x, btn_charge.rect.bottom + 5, 70, 10))
+    pygame.draw.rect(virtual_screen, GREEN if state.power_level > 30 else RED, (btn_charge.rect.x, btn_charge.rect.bottom + 5, int(70 * (state.power_level/100)), 10))
 
     if state.walking_in and img_p2_raw:
         scaled_walk = pygame.transform.smoothscale(img_p2_raw, (130, 350))
-        screen.blit(scaled_walk, (state.walker_x, 150))
+        virtual_screen.blit(scaled_walk, (state.walker_x, 150))
 
     if state.flashlight_on and state.power_level > 0:
         mouse_x, mouse_y = mouse_pos
@@ -297,66 +302,141 @@ def draw_room(mouse_pos):
             ga = max(0, 80 - (i * 10)) 
             surf = pygame.Surface((gr * 2, gr * 2), pygame.SRCALPHA)
             pygame.draw.circle(surf, (255, 255, 220, ga), (gr, gr), gr)
-            screen.blit(surf, (mouse_x - gr, mouse_y - gr))
+            virtual_screen.blit(surf, (mouse_x - gr, mouse_y - gr))
 
     if state.alarm_active:
         if (pygame.time.get_ticks() // 250) % 2 == 0:
             overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             overlay.fill((200, 0, 0, 50))
-            screen.blit(overlay, (0, 0))
+            virtual_screen.blit(overlay, (0, 0))
             
         time_left = max(0, 5000 - (pygame.time.get_ticks() - state.alarm_timer_start)) / 1000
         alarm_text = font_menu.render(f"LARM WENT OFF! CLICK THE CIRCLES! {time_left:.1f}s", True, RED)
-        screen.blit(alarm_text, (WIDTH//2 - alarm_text.get_width()//2 - 10, 50))
+        virtual_screen.blit(alarm_text, (WIDTH//2 - alarm_text.get_width()//2 - 10, 50))
         
         for circle in state.alarm_circles:
-            pygame.draw.circle(screen, RED, circle.center, circle.width // 2)
-            pygame.draw.circle(screen, WHITE, circle.center, circle.width // 2, 3)
+            pygame.draw.circle(virtual_screen, RED, circle.center, circle.width // 2)
+            pygame.draw.circle(virtual_screen, WHITE, circle.center, circle.width // 2, 3)
 
     draw_clock()
 
 def draw_peephole():
-    screen.fill(BLACK)
-    pygame.draw.circle(screen, (35, 35, 40), (WIDTH//2, HEIGHT//2), 200)
+    virtual_screen.fill(BLACK)
+    pygame.draw.circle(virtual_screen, (35, 35, 40), (WIDTH//2, HEIGHT//2), 200)
     
     if state.visitor_outside:
         img = img_p1_peephole if state.visitor_type == 1 else img_p2_peephole
-        if img: screen.blit(img, (WIDTH//2 - img.get_width()//2, HEIGHT//2 - img.get_height()//2))
+        if img: virtual_screen.blit(img, (WIDTH//2 - img.get_width()//2, HEIGHT//2 - img.get_height()//2))
             
     for i in range(200, 500, 10): 
-        pygame.draw.circle(screen, BLACK, (WIDTH//2, HEIGHT//2), i, 15)
+        pygame.draw.circle(virtual_screen, BLACK, (WIDTH//2, HEIGHT//2), i, 15)
         
     draw_clock()
 
 def draw_menu(mouse_pos):
-    if img_menu_bg: screen.blit(img_menu_bg, (0, 0))
-    else: screen.fill(BLACK)
-    screen.blit(font_menu.render(f"THE PEEPHOLE", True, DARK_GREY), (WIDTH//2 - 105, 102))
-    screen.blit(font_menu.render(f"THE PEEPHOLE", True, RED), (WIDTH//2 - 105, 100))
-    btn_start.draw(screen, mouse_pos)
-    btn_achievements.draw(screen, mouse_pos)
-    btn_settings.draw(screen, mouse_pos)
-    btn_close.draw(screen, mouse_pos)
+    if img_menu_bg: virtual_screen.blit(img_menu_bg, (0, 0))
+    else: virtual_screen.fill(BLACK)
+    virtual_screen.blit(font_menu.render(f"THE PEEPHOLE", True, DARK_GREY), (WIDTH//2 - 105, 102))
+    virtual_screen.blit(font_menu.render(f"THE PEEPHOLE", True, RED), (WIDTH//2 - 105, 100))
+    btn_start.draw(virtual_screen, mouse_pos)
+    btn_achievements.draw(virtual_screen, mouse_pos)
+    btn_settings.draw(virtual_screen, mouse_pos)
+    btn_close.draw(virtual_screen, mouse_pos)
+
+def draw_intro(mouse_pos):
+    virtual_screen.fill(BLACK)
+    intro_lines = [
+        "You came home from work and went to sleep, in your",
+        "dream a man comes to you and says:",
+        "",
+        "\"You will be visited by my friends now until midnight.",
+        "The angriest of them will be the one to appear the",
+        "calmest when knocking on your door. DO NOT OPEN THE DOOR,",
+        "look at him through the peephole to make him go away.",
+        "The shy one will get angry if you look at him, just open",
+        "the door for him, and he will leave you alone.",
+        "A pair will also occasionaly appear outside your window.",
+        "They don't like the light in your hallway, and may not",
+        "like your flashlight either. Wake up.\""
+    ]
+    start_y = HEIGHT // 2 - 150
+    for i, line in enumerate(intro_lines):
+        t = font_small.render(line, True, WHITE)
+        virtual_screen.blit(t, (WIDTH // 2 - t.get_width() // 2, start_y + (i * 26)))
+        
+    btn_wakeup.draw(virtual_screen, mouse_pos)
 
 def draw_achievements():
-    screen.fill(BLACK)
+    virtual_screen.fill(BLACK)
     at = font_menu.render("ACHIEVEMENTS", True, GOLD)
-    screen.blit(at, (WIDTH//2 - at.get_width()//2, 100))
-    screen.blit(font_small.render(f"WINS: {game_data[0]}", True, WHITE), (WIDTH//2 - 50, 250))
-    screen.blit(font_small.render(f"DEATHS: {game_data[1]}", True, WHITE), (WIDTH//2 - 50, 280))
+    virtual_screen.blit(at, (WIDTH//2 - at.get_width()//2, 100))
+    if game_data[1] == 0:
+        winrate = 0
+    else:
+        winrate = int(((game_data[0]) / ((game_data[0]) + (game_data[1])) * 100))
+    virtual_screen.blit(font_small.render(f"WINRATE: {winrate}%", True, WHITE), (WIDTH//2 - 65, 220))
+    virtual_screen.blit(font_small.render(f"WINS: {game_data[0]}", True, WHITE), (WIDTH//2 - 150, 250))
+    virtual_screen.blit(font_small.render(f"DEATHS: {game_data[1]}", True, WHITE), (WIDTH//2 + 50, 250))
+    if game_data[2] == 0:
+        virtual_screen.blit(font_small.render(f"SURVIVOR: Survive your first night", True, RED), (WIDTH//2 - 200, 320))
+    elif game_data[2] == 1:
+        virtual_screen.blit(font_small.render(f"SURVIVOR: Survive your first night", True, GREEN), (WIDTH//2 - 200, 320))
+
+    if game_data[3] == 0:
+        virtual_screen.blit(font_small.render(f"FIRST OF MANY: Die for the first time", True, RED), (WIDTH//2 - 200, 370))
+    elif game_data[3] == 1:
+        virtual_screen.blit(font_small.render(f"FIRST OF MANY: Die for the first time", True, GREEN), (WIDTH//2 - 200, 370))
+
+    if game_data[4] == 0:
+        virtual_screen.blit(font_small.render(f"SECRET: Did you figure it out, or was it luck?", True, RED), (WIDTH//2 - 200, 420))
+    elif game_data[4] == 1:
+        virtual_screen.blit(font_small.render(f"SECRET: Did you figure it out, or was it luck?", True, GREEN), (WIDTH//2 - 200, 420))
+
+    
+
 
 def draw_settings(mouse_pos, mouse_pressed):
-    screen.fill(BLACK)
+    virtual_screen.fill(BLACK)
     at = font_menu.render("SETTINGS", True, GOLD)
-    screen.blit(at, (WIDTH//2 - at.get_width()//2, 100))
+    virtual_screen.blit(at, (WIDTH//2 - at.get_width()//2, 40))
+    
     vol_text = font_small.render(f"VOLUME: {int(volume_slider.val * 100)}%", True, WHITE)
-    screen.blit(vol_text, (WIDTH//2 - 100, 220))
+    virtual_screen.blit(vol_text, (WIDTH//2 - 100, 140))
     
     volume_slider.update(mouse_pos, mouse_pressed)
-    volume_slider.draw(screen)
+    volume_slider.draw(virtual_screen)
+
+    help_lines = [
+        "HELP & INSTRUCTIONS:",
+        "• Click CHARGE button; if your charge meter reaches zero, you die.",
+        "• When duo appears outside window, press F to use flashlight.",
+        "  Shine it at them until they vanish. Flashlight drains power faster.",
+        "",
+        "HEAVY DOOR KNOCKING:",
+        "• Click door knob to open. DO NOT CLICK ANYWHERE ELSE ON THE DOOR!",
+        "  Clicking elsewhere accesses peephole and looks at him, which kills you.",
+        "",
+        "CALM DOOR KNOCKING:",
+        "• Do not open door! Instead, click elsewhere on door to look through",
+        "  the peephole. Keep eyes on him until he disappears completely.",
+        "",
+        "CHARGE ALARM:",
+        "• Every charge click risks triggering an alarm. You will have 5 seconds",
+        "  to pop 3 consecutive circles. Fail twice, and your neighbor kills you."
+    ]
+
+    start_x = WIDTH // 2 - 360
+    start_y = 210
+    line_spacing = 22
+
+    for i, line in enumerate(help_lines):
+        if line.strip():
+            text_surface = font_small.render(line, True, WHITE)
+            virtual_screen.blit(text_surface, (start_x, start_y + (i * line_spacing)))
 
 def draw_lost(current_time):
     elapsed = current_time - state.death_time_start
+    game_data[3] = 1
     if elapsed < 2500:
         if not state.jumpscare_played:
             if "3" in state.death_reason:
@@ -368,7 +448,7 @@ def draw_lost(current_time):
             state.jumpscare_played = True
             
         shake_x, shake_y = random.randint(-15, 15), random.randint(-15, 15)
-        screen.fill((random.randint(0,20), 0, 0)) 
+        virtual_screen.fill((random.randint(0,20), 0, 0)) 
         
         if state.death_reason == "granne":
             img = img_granne
@@ -378,14 +458,14 @@ def draw_lost(current_time):
             img = img_p1_raw if ("1" in state.death_reason or "power" in state.death_reason) else img_p2_raw
             
         if img: 
-            screen.blit(pygame.transform.smoothscale(img, (WIDTH + 40, HEIGHT + 40)), (-20 + shake_x, -20 + shake_y))
+            virtual_screen.blit(pygame.transform.smoothscale(img, (WIDTH + 40, HEIGHT + 40)), (-20 + shake_x, -20 + shake_y))
             
         if state.death_reason == "granne":
             granne_text = font_menu.render("Neighbour threw you out", True, RED)
-            screen.blit(granne_text, (WIDTH//2 - granne_text.get_width()//2, HEIGHT - 80))
+            virtual_screen.blit(granne_text, (WIDTH//2 - granne_text.get_width()//2, HEIGHT - 80))
             
     elif elapsed < 5500:
-        screen.fill(BLACK)
+        virtual_screen.fill(BLACK)
     else: 
         state.scene = "menu"
         state.game_state = "playing"
@@ -393,12 +473,15 @@ def draw_lost(current_time):
 def draw_screen(mouse_pos, current_time, mouse_pressed):
     if state.scene == "menu":
         draw_menu(mouse_pos)
+    elif state.scene == "intro":
+        draw_intro(mouse_pos)
     elif state.scene == "achievements":
         draw_achievements()
     elif state.scene == "settings":
         draw_settings(mouse_pos, mouse_pressed)
     elif state.scene == "win":
-        screen.fill(BLACK)
+        virtual_screen.fill(BLACK)
+        game_data[2] = 1
         
         win_lines = [
             "As the clock strikes midnight,",
@@ -414,9 +497,9 @@ def draw_screen(mouse_pos, current_time, mouse_pressed):
         
         for i, line in enumerate(win_lines):
             t = font_menu.render(line, True, RED)
-            screen.blit(t, (WIDTH // 2 - t.get_width() // 2, start_y + (i * 35)))
+            virtual_screen.blit(t, (WIDTH // 2 - t.get_width() // 2, start_y + (i * 35)))
             
-        btn_continue.draw(screen, mouse_pos)
+        btn_continue.draw(virtual_screen, mouse_pos)
     elif state.game_state == "playing":
         if state.scene == "room": draw_room(mouse_pos)
         else: draw_peephole()
@@ -425,8 +508,23 @@ def draw_screen(mouse_pos, current_time, mouse_pressed):
 
 while True:
     current_time = pygame.time.get_ticks()
-    mouse_pos = pygame.mouse.get_pos()
-    mouse_x, mouse_y = mouse_pos
+    
+    raw_mouse_pos = pygame.mouse.get_pos()
+    current_w, current_h = screen.get_size()
+    
+    ratio = min(current_w / WIDTH, current_h / HEIGHT)
+    new_w = int(WIDTH * ratio)
+    new_h = int(HEIGHT * ratio)
+    offset_x = (current_w - new_w) // 2
+    offset_y = (current_h - new_h) // 2
+    
+    if new_w > 0 and new_h > 0:
+        mouse_x = int((raw_mouse_pos[0] - offset_x) * (WIDTH / new_w))
+        mouse_y = int((raw_mouse_pos[1] - offset_y) * (HEIGHT / new_h))
+    else:
+        mouse_x, mouse_y = raw_mouse_pos
+        
+    mouse_pos = (mouse_x, mouse_y)
     
     update_music(state.scene)
 
@@ -438,13 +536,18 @@ while True:
             if state.scene == "menu":
                 if btn_start.is_clicked(mouse_pos): 
                     state.reset()
-                    state.scene = "room"
+                    state.scene = "intro"
                 elif btn_achievements.is_clicked(mouse_pos): 
                     state.scene = "achievements"
                 elif btn_settings.is_clicked(mouse_pos): 
                     state.scene = "settings"
                 elif btn_close.is_clicked(mouse_pos): 
                     pygame.quit(); sys.exit()
+                    
+            elif state.scene == "intro":
+                if btn_wakeup.is_clicked(mouse_pos):
+                    state.scene = "room"
+                    state.last_minute_tick = pygame.time.get_ticks()
                     
             elif state.scene == "room" and state.game_state == "playing":
                 if state.alarm_active:
@@ -499,9 +602,17 @@ while True:
                     state.scene = "menu"
                     
         if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_LSUPER or event.key == pygame.K_RSUPER:
+                is_fullscreen = not is_fullscreen
+                if is_fullscreen:
+                    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                else:
+                    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
+                
             if event.key == berlinda_code[berlinda_index]:
                 berlinda_index += 1
                 if berlinda_index == len(berlinda_code):
+                    game_data[4] = 1
                     berlinda_mode = not berlinda_mode
                     berlinda_index = 0
                     current_playing_track = None
@@ -509,12 +620,12 @@ while True:
                 berlinda_index = 1 if event.key == pygame.K_b else 0
             if event.key == pygame.K_ESCAPE:
                 if state.scene == "peephole": state.scene = "room"
-                elif state.scene in ["achievements", "win", "settings"]: state.scene = "menu"
+                elif state.scene in ["intro", "achievements", "win", "settings"]: state.scene = "menu"
             
             if event.key == pygame.K_f and state.scene == "room" and state.game_state == "playing":
                 state.flashlight_on = not state.flashlight_on
 
-    if state.scene not in ["menu", "achievements", "win"] and state.game_state == "playing":
+    if state.scene not in ["menu", "intro", "achievements", "win"] and state.game_state == "playing":
         if state.alarm_active:
             if current_time - state.alarm_timer_start > 5000:
                 state.alarm_active = False
@@ -578,7 +689,13 @@ while True:
                 state.trigger_loss(f"monster{state.visitor_type}", current_time)
 
     mouse_pressed = pygame.mouse.get_pressed()
+    
     draw_screen(mouse_pos, current_time, mouse_pressed)
+
+    screen.fill(BLACK)
+    
+    scaled_surface = pygame.transform.smoothscale(virtual_screen, (new_w, new_h))
+    screen.blit(scaled_surface, (offset_x, offset_y))
 
     pygame.display.flip()
     clock.tick(60)
